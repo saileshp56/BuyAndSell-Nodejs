@@ -1,14 +1,19 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-var cors = require("cors");
-const puppeteer = require("puppeteer");
-const app = express();
+const { app, BrowserWindow } = require("electron");
+const express = require(__dirname + "/node_modules/express");
+const bodyParser = require(__dirname + "/node_modules/body-parser");
+var cors = require(__dirname + "/node_modules/cors");
+const puppeteer = require(__dirname + "/node_modules/puppeteer");
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cors()); // Use this after the variable declaration
-app.use(express.json());
+const path = require("path");
+const isDev = require("electron-is-dev");
 
-app.post("/scrapy", async (req, res, next) => {
+const server = express();
+
+server.use(bodyParser.urlencoded({ extended: false }));
+server.use(cors()); // Use this after the variable declaration
+server.use(express.json());
+
+server.post("/scrapy", async (req, res, next) => {
   console.log("Received post request at backend's /scrapy: ", req.body);
   const wordlist = ["buyandsell"];
   let allowedDomains = new Set(req.body.allowedDomains);
@@ -31,7 +36,7 @@ app.post("/scrapy", async (req, res, next) => {
     startUrls = ["https://buyandsell.gc.ca/for-businesses"];
   }
   if (!time) {
-    time = 9;
+    time = 2;
   }
 
   console.log(
@@ -116,6 +121,30 @@ app.post("/scrapy", async (req, res, next) => {
   res.json(ds);
 });
 
-app.listen(5000, () => console.log("server listening on port 5000"));
+server.listen(5000, () => console.log("Express server listening on port 5000"));
 
-// module.exports.handler = serverless(app);
+let mainWindow;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({ width: 900, height: 680 });
+  mainWindow.loadURL(
+    isDev
+      ? "http://localhost:3000"
+      : `file://${path.join(__dirname, "../frontend/build/index.html")}`
+  );
+  mainWindow.on("closed", () => (mainWindow = null));
+}
+
+app.on("ready", createWindow);
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
